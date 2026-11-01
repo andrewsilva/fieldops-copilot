@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from .agent import OperationsAgent
 from .db import get_connection
-from .ollama import OllamaClient, OllamaError
+from .groq import GroqClient, GroqError
 from .services import find_stock, list_low_stock, sales_summary
 
 app = FastAPI(title="FieldOps Copilot", version="0.1.0")
@@ -23,7 +23,7 @@ Connection = Annotated[object, Depends(connection_dependency)]
 
 class ChatRequest(BaseModel):
     message: str
-    use_local_model: bool = False
+    use_groq: bool = False
 
 
 @app.get("/health")
@@ -59,12 +59,12 @@ def summary(
 
 @app.post("/chat")
 def chat(request: ChatRequest, connection: Connection):
-    language_model = OllamaClient() if request.use_local_model else None
+    language_model = GroqClient() if request.use_groq else None
     try:
         result = OperationsAgent(
             connection, language_model=language_model
         ).answer(request.message)
-    except OllamaError as error:
+    except GroqError as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
     return {
         "message": result.message,

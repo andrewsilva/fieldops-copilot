@@ -5,7 +5,7 @@ from datetime import date
 from fieldops.agent import OperationsAgent
 from fieldops.api import app
 from fieldops.db import connect
-from fieldops.ollama import OllamaClient
+from fieldops.groq import GroqClient, GroqError
 
 
 client = TestClient(app)
@@ -105,7 +105,7 @@ def test_agent_can_use_a_local_model_to_rephrase_tool_result():
     assert result.tool_name == "listar_estoque_baixo"
 
 
-def test_ollama_client_parses_generate_response(monkeypatch):
+def test_groq_client_parses_chat_response(monkeypatch):
     class FakeResponse:
         def __enter__(self):
             return self
@@ -114,8 +114,17 @@ def test_ollama_client_parses_generate_response(monkeypatch):
             return False
 
         def read(self):
-            return b'{"response":" resposta local "}'
+            return b'{"choices":[{"message":{"content":" resposta online "}}]}'
 
-    monkeypatch.setattr("fieldops.ollama.urlopen", lambda *args, **kwargs: FakeResponse())
+    monkeypatch.setattr("fieldops.groq.urlopen", lambda *args, **kwargs: FakeResponse())
 
-    assert OllamaClient(timeout=1).generate("oi") == "resposta local"
+    assert GroqClient(api_key="test-key", timeout=1).generate("oi") == "resposta online"
+
+
+def test_groq_client_requires_api_key():
+    try:
+        GroqClient(api_key="").generate("oi")
+    except GroqError as error:
+        assert "GROQ_API_KEY" in str(error)
+    else:
+        raise AssertionError("A chamada deveria exigir uma chave do Groq")

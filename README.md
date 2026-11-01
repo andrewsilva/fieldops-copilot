@@ -14,7 +14,7 @@ Esta primeira etapa entrega um núcleo HTTP pequeno e determinístico:
 - catálogo de ferramentas tipadas para o agente;
 - orquestrador determinístico para perguntas em português;
 - endpoint `POST /chat` com registro da ferramenta e dos argumentos usados.
-- integração opcional com um modelo local via Ollama para melhorar a redação da resposta.
+- integração opcional com o Groq para melhorar a redação da resposta.
 
 O modelo de linguagem, WhatsApp e transcrição de áudio entram nas próximas etapas. A regra é manter o domínio independente do canal de entrada.
 
@@ -37,23 +37,25 @@ Invoke-RestMethod http://127.0.0.1:8000/chat -Method Post `
   -Body '{"message":"Quais produtos estão com baixo estoque?"}'
 ```
 
-### Modelo local opcional
+### Groq opcional
 
-Instale o [Ollama](https://ollama.com), inicie o serviço e baixe um modelo:
+Crie uma chave no [Groq Console](https://console.groq.com/keys) e configure-a
+somente no ambiente local:
 
 ```powershell
-ollama pull qwen2.5:3b
+$env:GROQ_API_KEY = "sua-chave-aqui"
 ```
 
-Para usar o modelo na resposta, envie `use_local_model: true`:
+O modelo padrão é `llama-3.1-8b-instant`. Para usar o Groq na resposta:
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8000/chat -Method Post `
   -ContentType "application/json" `
-  -Body '{"message":"Quais produtos estão com baixo estoque?","use_local_model":true}'
+  -Body '{"message":"Quais produtos estão com baixo estoque?","use_groq":true}'
 ```
 
-Sem esse campo, nenhuma chamada externa é feita e o agente determinístico continua sendo usado.
+Sem `GROQ_API_KEY`, o modo Groq retorna erro explicitamente. Sem `use_groq`,
+nenhuma chamada externa é feita e o agente determinístico continua sendo usado.
 
 ## Testes
 
