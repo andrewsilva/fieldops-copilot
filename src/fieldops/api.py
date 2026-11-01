@@ -4,7 +4,9 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Query
+from pydantic import BaseModel
 
+from .agent import OperationsAgent
 from .db import get_connection
 from .services import find_stock, list_low_stock, sales_summary
 
@@ -16,6 +18,10 @@ def connection_dependency():
 
 
 Connection = Annotated[object, Depends(connection_dependency)]
+
+
+class ChatRequest(BaseModel):
+    message: str
 
 
 @app.get("/health")
@@ -47,3 +53,14 @@ def summary(
             status_code=400, detail="A data final deve ser maior ou igual à inicial"
         )
     return sales_summary(connection, start, end)
+
+
+@app.post("/chat")
+def chat(request: ChatRequest, connection: Connection):
+    result = OperationsAgent(connection).answer(request.message)
+    return {
+        "message": result.message,
+        "tool": result.tool_name,
+        "arguments": result.tool_arguments,
+        "data": result.data,
+    }

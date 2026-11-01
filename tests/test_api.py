@@ -1,6 +1,10 @@
 from fastapi.testclient import TestClient
 
+from datetime import date
+
+from fieldops.agent import OperationsAgent
 from fieldops.api import app
+from fieldops.db import connect
 
 
 client = TestClient(app)
@@ -47,3 +51,38 @@ def test_sales_summary_rejects_reversed_range():
     )
 
     assert response.status_code == 400
+
+
+def test_agent_routes_low_stock_question_to_typed_tool():
+    agent = OperationsAgent(connect(), today=date(2026, 10, 31))
+
+    result = agent.answer("Quais produtos estão com baixo estoque?")
+
+    assert result.tool_name == "listar_estoque_baixo"
+    assert "2 produto(s)" in result.message
+    assert result.data[0]["sku"] == "CAM-001"
+
+
+def test_chat_routes_sales_question_and_returns_audit_data():
+    response = client.post(
+        "/chat",
+        json={"message": "Quanto vendemos de 2026-10-31 a 2026-10-31?"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["tool"] == "resumir_vendas"
+    assert body["arguments"] == {
+        "start": "2026-10-31",
+        "end": "2026-10-31",
+    }
+    assert "R$ 425,00" in body["message"]
+
+
+def test_agent_rejects_unknown_request_without_calling_a_tool():
+    agent = OperationsAgent(connect(), today=date(2026, 10, 31))
+
+    result = agent.answer("Me conte uma piada")
+
+    assert result.tool_name is None
+    assert "Ainda não consigo" in result.message
