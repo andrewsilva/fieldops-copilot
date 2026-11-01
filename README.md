@@ -29,6 +29,10 @@ pip install -e ".[dev]"
 uvicorn fieldops.api:app --reload
 ```
 
+Na cópia local, preencha o arquivo `.env` com o token novo da Meta e o
+`WHATSAPP_PHONE_NUMBER_ID`. O arquivo já está ignorado pelo Git. Use
+`.env.example` como referência e nunca cole tokens reais no repositório.
+
 Depois, abra `http://127.0.0.1:8000/docs`.
 
 Exemplo de chamada:
