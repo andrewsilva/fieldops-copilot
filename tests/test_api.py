@@ -128,3 +128,83 @@ def test_groq_client_requires_api_key():
         assert "GROQ_API_KEY" in str(error)
     else:
         raise AssertionError("A chamada deveria exigir uma chave do Groq")
+
+
+def test_whatsapp_webhook_returns_meta_challenge(monkeypatch):
+    monkeypatch.setenv("WHATSAPP_VERIFY_TOKEN", "fieldops-dev")
+
+    response = client.get(
+        "/webhooks/whatsapp",
+        params={
+            "hub.mode": "subscribe",
+            "hub.verify_token": "fieldops-dev",
+            "hub.challenge": "12345",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.text == "12345"
+
+
+def test_whatsapp_webhook_routes_text_to_agent():
+    response = client.post(
+        "/webhooks/whatsapp",
+        json={
+            "object": "whatsapp_business_account",
+            "entry": [
+                {
+                    "changes": [
+                        {
+                            "value": {
+                                "messages": [
+                                    {
+                                        "id": "wamid.test",
+                                        "from": "5511999999999",
+                                        "type": "text",
+                                        "text": {
+                                            "body": "Quais produtos estão com baixo estoque?"
+                                        },
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["received"] == 1
+    assert body["replies"][0]["sender_id"] == "5511999999999"
+    assert body["replies"][0]["tool"] == "listar_estoque_baixo"
+
+
+def test_whatsapp_webhook_acknowledges_non_text_message():
+    response = client.post(
+        "/webhooks/whatsapp",
+        json={
+            "entry": [
+                {
+                    "changes": [
+                        {
+                            "value": {
+                                "messages": [
+                                    {
+                                        "id": "wamid.audio",
+                                        "from": "5511999999999",
+                                        "type": "audio",
+                                        "audio": {"id": "media-id"},
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    assert "Áudio entra" in response.json()["replies"][0]["message"]

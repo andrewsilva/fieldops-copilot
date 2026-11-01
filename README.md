@@ -2,7 +2,7 @@
 
 POC de um assistente operacional que futuramente poderá receber mensagens de texto e áudio pelo WhatsApp para consultar estoque, vendas e compras.
 
-## Etapas 1 e 2
+## Etapas 1 a 4
 
 Esta primeira etapa entrega um núcleo HTTP pequeno e determinístico:
 
@@ -15,8 +15,9 @@ Esta primeira etapa entrega um núcleo HTTP pequeno e determinístico:
 - orquestrador determinístico para perguntas em português;
 - endpoint `POST /chat` com registro da ferramenta e dos argumentos usados.
 - integração opcional com o Groq para melhorar a redação da resposta.
+- adapter inicial da WhatsApp Cloud API para verificação e recebimento de mensagens.
 
-O modelo de linguagem, WhatsApp e transcrição de áudio entram nas próximas etapas. A regra é manter o domínio independente do canal de entrada.
+O adapter ainda não envia respostas pela Meta; ele normaliza o webhook e devolve a resposta calculada para a próxima camada de envio.
 
 ## Executando localmente
 
@@ -63,9 +64,21 @@ nenhuma chamada externa é feita e o agente determinístico continua sendo usado
 pytest
 ```
 
+## Webhook da WhatsApp Cloud API
+
+Configure o token usado pela verificação da Meta:
+
+```powershell
+$env:WHATSAPP_VERIFY_TOKEN = "fieldops-dev"
+```
+
+Cadastre `https://seu-host/webhooks/whatsapp` como callback URL. O `GET` responde
+ao desafio da Meta e o `POST` processa mensagens de texto. Mensagens de áudio são
+reconhecidas, mas ainda aguardam a etapa de transcrição.
+
 ## Próximas etapas
 
-1. Integrar um modelo local via Ollama mantendo as mesmas ferramentas.
-2. Criar adapter de mensagens para a WhatsApp Cloud API.
+1. Adicionar cliente de envio da WhatsApp Cloud API.
+2. Adicionar áudio, download de mídia e transcrição.
 3. Adicionar confirmação explícita para operações que alteram dados.
-4. Adicionar áudio, transcrição local e auditoria das interações.
+4. Adicionar auditoria persistente das interações.

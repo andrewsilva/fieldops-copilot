@@ -40,7 +40,7 @@ VALUES
 
 
 def connect(database: str | Path = ":memory:") -> sqlite3.Connection:
-    connection = sqlite3.connect(database)
+    connection = sqlite3.connect(database, check_same_thread=False)
     connection.row_factory = sqlite3.Row
     connection.executescript(SCHEMA)
     connection.executescript(SEED)
