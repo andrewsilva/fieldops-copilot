@@ -6,6 +6,7 @@ from fieldops.agent import OperationsAgent
 from fieldops.api import app
 from fieldops.db import connect
 from fieldops.groq import GroqClient, GroqError
+from fieldops.whatsapp import WhatsAppClient, WhatsAppError
 
 
 client = TestClient(app)
@@ -208,3 +209,91 @@ def test_whatsapp_webhook_acknowledges_non_text_message():
 
     assert response.status_code == 200
     assert "Áudio entra" in response.json()["replies"][0]["message"]
+
+
+def test_whatsapp_client_posts_text_and_returns_meta_message_id(monkeypatch):
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return b'{"messages":[{"id":"wamid.response"}]}'
+
+    captured = {}
+
+    def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
+        captured["authorization"] = request.get_header("Authorization")
+        captured["body"] = request.data
+        captured["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr("fieldops.whatsapp.urlopen", fake_urlopen)
+
+    client = WhatsAppClient(
+        access_token="secret-token",
+        phone_number_id="123456",
+        api_version="v23.0",
+    )
+
+    assert client.send_text("5511999999999", "Olá") == "wamid.response"
+    assert captured["url"].endswith("/v23.0/123456/messages")
+    assert captured["authorization"] == "Bearer secret-token"
+    assert b'"to": "5511999999999"' in captured["body"]
+
+
+def test_whatsapp_client_requires_credentials():
+    client = WhatsAppClient(access_token="", phone_number_id="")
+
+    try:
+        client.send_text("5511999999999", "Olá")
+    except WhatsAppError as error:
+        assert "WHATSAPP_ACCESS_TOKEN" in str(error)
+    else:
+        raise AssertionError("A chamada deveria exigir as credenciais da Meta")
+
+
+def test_whatsapp_webhook_sends_reply_when_meta_is_configured(monkeypatch):
+    sent = {}
+
+    def fake_send(self, recipient, text):
+        sent["recipient"] = recipient
+        sent["text"] = text
+        return "wamid.sent"
+
+    monkeypatch.setenv("WHATSAPP_ACCESS_TOKEN", "test-token")
+    monkeypatch.setenv("WHATSAPP_PHONE_NUMBER_ID", "phone-id")
+    monkeypatch.setattr(WhatsAppClient, "send_text", fake_send)
+
+    response = client.post(
+        "/webhooks/whatsapp",
+        json={
+            "entry": [
+                {
+                    "changes": [
+                        {
+                            "value": {
+                                "messages": [
+                                    {
+                                        "id": "wamid.incoming",
+                                        "from": "5511999999999",
+                                        "type": "text",
+                                        "text": {
+                                            "body": "Quais produtos estão com baixo estoque?"
+                                        },
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["replies"][0]["sent_message_id"] == "wamid.sent"
+    assert sent["recipient"] == "5511999999999"

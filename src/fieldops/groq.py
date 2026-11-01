@@ -50,7 +50,7 @@ class GroqClient:
             f"{self.base_url}/chat/completions",
             data=payload,
             headers={
-                "Authorization": f"Bearer {self.api_key}",
+                "Authorization": "Bearer " + self.api_key,
                 "Content-Type": "application/json",
             },
             method="POST",

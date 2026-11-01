@@ -10,7 +10,12 @@ from .agent import OperationsAgent
 from .db import get_connection
 from .groq import GroqClient, GroqError
 from .services import find_stock, list_low_stock, sales_summary
-from .whatsapp import parse_messages, verify_webhook
+from .whatsapp import (
+    WhatsAppClient,
+    WhatsAppError,
+    parse_messages,
+    verify_webhook,
+)
 
 app = FastAPI(title="FieldOps Copilot", version="0.1.0")
 
@@ -91,28 +96,42 @@ def verify_whatsapp_webhook(
 async def receive_whatsapp_webhook(request: Request, connection: Connection):
     payload = await request.json()
     messages = parse_messages(payload)
+    whatsapp = WhatsAppClient()
     replies = []
     for message in messages:
         if message.message_type != "text" or not message.text:
-            replies.append(
-                {
-                    "message_id": message.message_id,
-                    "sender_id": message.sender_id,
-                    "message": (
-                        "Por enquanto consigo processar mensagens de texto. "
-                        "Áudio entra na próxima etapa."
-                    ),
-                }
+            reply_text = (
+                "Por enquanto consigo processar mensagens de texto. "
+                "Áudio entra na próxima etapa."
             )
-            continue
-        result = OperationsAgent(connection).answer(message.text)
-        replies.append(
-            {
+            reply = {
                 "message_id": message.message_id,
                 "sender_id": message.sender_id,
-                "message": result.message,
-                "tool": result.tool_name,
-                "arguments": result.tool_arguments,
+                "message": reply_text,
             }
-        )
+            if whatsapp.configured:
+                try:
+                    reply["sent_message_id"] = whatsapp.send_text(
+                        message.sender_id, reply_text
+                    )
+                except WhatsAppError as error:
+                    raise HTTPException(status_code=502, detail=str(error)) from error
+            replies.append(reply)
+            continue
+        result = OperationsAgent(connection).answer(message.text)
+        reply = {
+            "message_id": message.message_id,
+            "sender_id": message.sender_id,
+            "message": result.message,
+            "tool": result.tool_name,
+            "arguments": result.tool_arguments,
+        }
+        if whatsapp.configured:
+            try:
+                reply["sent_message_id"] = whatsapp.send_text(
+                    message.sender_id, result.message
+                )
+            except WhatsAppError as error:
+                raise HTTPException(status_code=502, detail=str(error)) from error
+        replies.append(reply)
     return {"received": len(messages), "replies": replies}

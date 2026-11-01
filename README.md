@@ -2,7 +2,7 @@
 
 POC de um assistente operacional que futuramente poderá receber mensagens de texto e áudio pelo WhatsApp para consultar estoque, vendas e compras.
 
-## Etapas 1 a 4
+## Etapas 1 a 5
 
 Esta primeira etapa entrega um núcleo HTTP pequeno e determinístico:
 
@@ -15,9 +15,10 @@ Esta primeira etapa entrega um núcleo HTTP pequeno e determinístico:
 - orquestrador determinístico para perguntas em português;
 - endpoint `POST /chat` com registro da ferramenta e dos argumentos usados.
 - integração opcional com o Groq para melhorar a redação da resposta.
-- adapter inicial da WhatsApp Cloud API para verificação e recebimento de mensagens.
+- adapter inicial da WhatsApp Cloud API para verificação, recebimento e envio de mensagens.
 
-O adapter ainda não envia respostas pela Meta; ele normaliza o webhook e devolve a resposta calculada para a próxima camada de envio.
+Sem credenciais da Meta, o adapter apenas devolve a resposta calculada. Com as
+credenciais configuradas, ele envia a resposta pela Cloud API.
 
 ## Executando localmente
 
@@ -70,15 +71,17 @@ Configure o token usado pela verificação da Meta:
 
 ```powershell
 $env:WHATSAPP_VERIFY_TOKEN = "fieldops-dev"
+$env:WHATSAPP_ACCESS_TOKEN = "seu-token-da-meta"
+$env:WHATSAPP_PHONE_NUMBER_ID = "id-do-numero-de-teste"
 ```
 
 Cadastre `https://seu-host/webhooks/whatsapp` como callback URL. O `GET` responde
-ao desafio da Meta e o `POST` processa mensagens de texto. Mensagens de áudio são
-reconhecidas, mas ainda aguardam a etapa de transcrição.
+ao desafio da Meta e o `POST` processa mensagens de texto. Quando as credenciais
+estão configuradas, a resposta também é enviada ao remetente. Mensagens de áudio
+são reconhecidas, mas ainda aguardam a etapa de transcrição.
 
 ## Próximas etapas
 
-1. Adicionar cliente de envio da WhatsApp Cloud API.
-2. Adicionar áudio, download de mídia e transcrição.
-3. Adicionar confirmação explícita para operações que alteram dados.
-4. Adicionar auditoria persistente das interações.
+1. Adicionar áudio, download de mídia e transcrição.
+2. Adicionar confirmação explícita para operações que alteram dados.
+3. Adicionar auditoria persistente das interações.
