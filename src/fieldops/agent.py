@@ -7,6 +7,7 @@ from datetime import date
 from dataclasses import dataclass
 
 from .tools import Tool, build_tools
+from .ollama import OllamaClient
 
 
 @dataclass(frozen=True)
@@ -40,9 +41,11 @@ class OperationsAgent:
         self,
         connection: sqlite3.Connection,
         today: date | None = None,
+        language_model: OllamaClient | None = None,
     ) -> None:
         self.tools = build_tools(connection)
         self.today = today or date.today()
+        self.language_model = language_model
 
     def answer(self, text: str) -> AgentResult:
         normalized = _normalize(text)
@@ -93,11 +96,27 @@ class OperationsAgent:
         formatter,
     ) -> AgentResult:
         data = tool.handler(**arguments)
-        return AgentResult(
+        result = AgentResult(
             message=formatter(data),
             tool_name=tool.name,
             tool_arguments=arguments,
             data=data,
+        )
+        if self.language_model is None:
+            return result
+        prompt = (
+            "Você é um assistente de operações. Responda em português do Brasil, "
+            "de forma curta e objetiva. Não invente dados. Use somente o resultado "
+            "da ferramenta abaixo.\n\n"
+            f"Ferramenta: {tool.name}\n"
+            f"Resultado: {data!r}\n"
+            f"Resposta-base: {result.message}\n"
+        )
+        return AgentResult(
+            message=self.language_model.generate(prompt),
+            tool_name=result.tool_name,
+            tool_arguments=result.tool_arguments,
+            data=result.data,
         )
 
     @staticmethod

@@ -5,6 +5,7 @@ from datetime import date
 from fieldops.agent import OperationsAgent
 from fieldops.api import app
 from fieldops.db import connect
+from fieldops.ollama import OllamaClient
 
 
 client = TestClient(app)
@@ -86,3 +87,35 @@ def test_agent_rejects_unknown_request_without_calling_a_tool():
 
     assert result.tool_name is None
     assert "Ainda não consigo" in result.message
+
+
+def test_agent_can_use_a_local_model_to_rephrase_tool_result():
+    class FakeModel:
+        def generate(self, prompt: str) -> str:
+            assert "listar_estoque_baixo" in prompt
+            return "Atenção: há produtos que precisam de reposição."
+
+    agent = OperationsAgent(
+        connect(), today=date(2026, 10, 31), language_model=FakeModel()
+    )
+
+    result = agent.answer("Quais produtos estão com baixo estoque?")
+
+    assert result.message == "Atenção: há produtos que precisam de reposição."
+    assert result.tool_name == "listar_estoque_baixo"
+
+
+def test_ollama_client_parses_generate_response(monkeypatch):
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return b'{"response":" resposta local "}'
+
+    monkeypatch.setattr("fieldops.ollama.urlopen", lambda *args, **kwargs: FakeResponse())
+
+    assert OllamaClient(timeout=1).generate("oi") == "resposta local"

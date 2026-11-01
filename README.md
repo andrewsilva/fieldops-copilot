@@ -14,6 +14,7 @@ Esta primeira etapa entrega um núcleo HTTP pequeno e determinístico:
 - catálogo de ferramentas tipadas para o agente;
 - orquestrador determinístico para perguntas em português;
 - endpoint `POST /chat` com registro da ferramenta e dos argumentos usados.
+- integração opcional com um modelo local via Ollama para melhorar a redação da resposta.
 
 O modelo de linguagem, WhatsApp e transcrição de áudio entram nas próximas etapas. A regra é manter o domínio independente do canal de entrada.
 
@@ -35,6 +36,24 @@ Invoke-RestMethod http://127.0.0.1:8000/chat -Method Post `
   -ContentType "application/json" `
   -Body '{"message":"Quais produtos estão com baixo estoque?"}'
 ```
+
+### Modelo local opcional
+
+Instale o [Ollama](https://ollama.com), inicie o serviço e baixe um modelo:
+
+```powershell
+ollama pull qwen2.5:3b
+```
+
+Para usar o modelo na resposta, envie `use_local_model: true`:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/chat -Method Post `
+  -ContentType "application/json" `
+  -Body '{"message":"Quais produtos estão com baixo estoque?","use_local_model":true}'
+```
+
+Sem esse campo, nenhuma chamada externa é feita e o agente determinístico continua sendo usado.
 
 ## Testes
 
